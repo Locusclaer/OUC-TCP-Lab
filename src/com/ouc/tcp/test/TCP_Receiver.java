@@ -3,18 +3,21 @@
 package com.ouc.tcp.test;
 
 import com.ouc.tcp.client.TCP_Receiver_ADT;
+import com.ouc.tcp.client.UDT_Timer;
 import com.ouc.tcp.message.TCP_PACKET;
 
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.TimerTask;
 
 public class TCP_Receiver extends TCP_Receiver_ADT {
 
     private TCP_PACKET ackPack;    //回复的ACK报文段
     private ReceiverWindow window = new ReceiverWindow(16);
-    int sequence = 0;//用于记录当前待接收的包序号，注意包序号不完全是
+
+    private UDT_Timer cumulativeTimer = new UDT_Timer(); // 设置计时器用于进行累计确认
 
     /*构造函数*/
     public TCP_Receiver() {
@@ -30,25 +33,37 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
             System.out.println();
             return;
         }
-        //生成ACK报文段（设置确认号）
+        // 生成ACK报文段（设置确认号）
         // 对收到的包进行处理，看看属于那种情况
         int bufferResult = window.bufferPacket(recvPack);
-        // 接收到期望数据包、窗口内重复数据包、窗口内非base数据包可以进行存储并回复
-        if (bufferResult != AckFlag.OUTSIDE.ordinal()) {
-            tcpH.setTh_ack(recvPack.getTcpH().getTh_seq());
-            ackPack = new TCP_PACKET(tcpH, tcpS, recvPack.getSourceAddr());
-            tcpH.setTh_sum(CheckSum.computeChkSum(ackPack));
-            //回复ACK报文段
-            reply(ackPack);
-        }
-
-        //将接收到的正确有序的数据插入data队列，准备交付
+        // 接收到期望数据包可以进行存储并累积回复
         if (bufferResult == AckFlag.IS_BASE.ordinal()) {
             TCP_PACKET packet = window.PacketDeliver();
             while (packet != null) {
+                // 1. 将数据存入队列
                 dataQueue.add(packet.getTcpS().getData());
+
+                // 2. 更新最后交付的序列号
+                tcpH.setTh_ack(recvPack.getTcpH().getTh_seq());
+                ackPack = new TCP_PACKET(tcpH, tcpS, recvPack.getSourceAddr());
+                tcpH.setTh_sum(CheckSum.computeChkSum(ackPack));
+                ackPack.setTcpH(tcpH);
+
+                // 3. 获取下一个包
                 packet = window.PacketDeliver();
             }
+
+            // 重新设置计时器，因为此时已经收到了base数据包，需要将计时器重置，如果在500ms内未收到base，则回复
+            cumulativeTimer.cancel();
+            cumulativeTimer = new UDT_Timer();
+            cumulativeTimer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    reply(ackPack);
+                }
+            }, 500);
+        } else if (bufferResult != AckFlag.WITHIN.ordinal()) {
+            reply(ackPack);
         }
 
         // 如果是错误的包，则不再回复 ACK

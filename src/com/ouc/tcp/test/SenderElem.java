@@ -1,11 +1,10 @@
 package com.ouc.tcp.test;
 
-import com.ouc.tcp.client.UDT_RetransTask;
 import com.ouc.tcp.client.UDT_Timer;
 import com.ouc.tcp.message.TCP_PACKET;
 
-import static com.ouc.tcp.test.SenderFlag.NOT_ACKED;
 import static com.ouc.tcp.test.SenderFlag.ACKED;
+import static com.ouc.tcp.test.SenderFlag.NOT_ACKED;
 
 
 public class SenderElem implements WindowElement{
@@ -35,10 +34,6 @@ public class SenderElem implements WindowElement{
     public void resetElem() {
         packet = null;
         flag = NOT_ACKED;
-        if (timer != null) {
-            timer.cancel();
-            timer = null;
-        }
     }
 
     // 检查数据包是否已收到确认
@@ -46,15 +41,8 @@ public class SenderElem implements WindowElement{
         return flag == ACKED;
     }
 
-    // 为数据包启动重传定时器
-    public void scheduleTask(UDT_RetransTask retransTask, int delay, int period) {
-        this.timer = new UDT_Timer();
-        this.timer.schedule(retransTask, delay, period);
-    }
-
     // 确认数据包已收到
     public void ackPacket() {
         this.flag = ACKED;
-        this.timer.cancel();
     }
 }
