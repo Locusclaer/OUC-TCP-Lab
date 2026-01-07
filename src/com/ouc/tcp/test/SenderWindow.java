@@ -10,9 +10,9 @@ public class SenderWindow {
     private final LinkedBlockingDeque<SenderElem> window;
 
     private UDT_Timer timer; // 为发送窗口设置计时器
-    private TCP_Sender sender;
-    private int delay = 3000;
-    private int period = 3000;
+    private final TCP_Sender sender;
+    private final int delay = 3000;
+    private final int period = 3000;
 
     private int cwnd = 1;
     private double dcwnd = 1.0;
@@ -29,27 +29,33 @@ public class SenderWindow {
     }
 
     // 超时重传N个分组
-    public class GBN_RetransTask extends TimerTask {
-        private SenderWindow window;
+    public static class GBN_RetransTask extends TimerTask {
+        private final SenderWindow window;
 
         public GBN_RetransTask(SenderWindow window) {
             this.window = window;
         }
 
+        @Override
         public void run() {
             window.SendtheWindow();
         }
     }
 
     private void SendtheWindow() {
-        ssthresh = Math.max(cwnd / 2, 2);
-        cwnd = 1;
-        dcwnd = 1.0;
-        SenderElem windowelem = window.peekFirst();
-        if (windowelem != null) {
-            sender.udt_send(windowelem.getPacket());
+//        ssthresh = Math.max(cwnd / 2, 2);
+//        cwnd = 1;
+//        dcwnd = 1.0;
+//        SenderElem windowelem = window.peekFirst();
+//        if (windowelem != null) {
+//            sender.udt_send(windowelem.getPacket());
+//        }
+        // 发送窗口中的数据
+        for (SenderElem elem : window) {
+            if (!elem.isAcked()) {
+                sender.udt_send(elem.getPacket());
+            }
         }
-
     }
 
     // 检查窗口是否已满，流量控制，防止发送超过拥塞窗口允许的数据。
@@ -64,20 +70,8 @@ public class SenderWindow {
             timer = new UDT_Timer();
             timer.schedule(new GBN_RetransTask(this), delay, period);
         }
-        window.push(new SenderElem(packet, SenderFlag.NOT_ACKED.ordinal()));
+        window.addLast(new SenderElem(packet, SenderFlag.NOT_ACKED.ordinal()));
         sender.udt_send(packet);
-    }
-
-    // 发送下一个数据包
-    public void SendPacket() {
-        SenderElem elem = window.pollFirst();
-        if (elem == null) {
-            return;
-        }
-        if (!elem.isAcked()) {
-            sender.udt_send(elem.getPacket());
-        }
-        window.offerFirst(elem);
     }
 
     // 重置计时器
@@ -113,7 +107,7 @@ public class SenderWindow {
                 }
                 // 拥塞避免阶段，加法增大，每次增大窗口分之一，一个RTT后拥塞窗口大小增大MSS
                 if (cwnd >= ssthresh) {
-                    dcwnd += 1 / cwnd;
+                    dcwnd += (double) 1 / cwnd;
                     cwnd = (int) dcwnd;
                 }
             } else {

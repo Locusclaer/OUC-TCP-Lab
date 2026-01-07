@@ -13,7 +13,7 @@ public class TCP_Sender extends TCP_Sender_ADT {
     public TCP_Sender() {
         super();    //调用超类构造函数
         super.initTCP_Sender(this);        //初始化TCP发送端
-        window = new SenderWindow(this, 16, 3000, 3000);
+        window = new SenderWindow(this);
     }
 
     @Override
@@ -30,7 +30,7 @@ public class TCP_Sender extends TCP_Sender_ADT {
         tcpPack.setTcpH(tcpH);
 
         // 空循环等待窗口滑动
-        while (window.isFull()) {
+        while (window.iscwndFull()) {
             Thread.onSpinWait();
         }
 
@@ -39,8 +39,6 @@ public class TCP_Sender extends TCP_Sender_ADT {
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
-
-        window.SendPacket(); // 发送数据包
     }
 
     @Override
