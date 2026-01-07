@@ -4,45 +4,35 @@ import com.ouc.tcp.client.UDT_Timer;
 import com.ouc.tcp.message.TCP_PACKET;
 
 import java.util.TimerTask;
+import java.util.concurrent.LinkedBlockingDeque;
 
 public class SenderWindow {
-    private final int size;
-    private final SenderElem[] window;
-    // [base, next - 1] -> 已经发送但是还没有被确认
-    // [next, rear - 1] -> 可以发送但是还没有发送
-    private int base; // 最早发送但尚未确认的数据包的序列号
-    private int nextPointer; // 下一个要发送的元素的下标
-    private int rearPointer; // 窗口中最后一个已经装入的数据包的位置+1
+    private final LinkedBlockingDeque<SenderElem> window;
 
     private UDT_Timer timer; // 为发送窗口设置计时器
     private TCP_Sender sender;
-    private int delay;
-    private int period;
+    private int delay = 3000;
+    private int period = 3000;
+
+    private int cwnd = 1;
+    private double dcwnd = 1.0;
+    private int ssthresh = 16;
+
+    private int latestseq = -1; // 最新收到的包的序号
+    private int latestseqnum = 0; // 最新收到的包收到的次数
 
     // 构造函数
-    public SenderWindow(TCP_Sender sender, int size, int delay, int period) {
-        this.size = size;
-        this.window = new SenderElem[size];
-        for (int i = 0; i < size; i++) {
-            this.window[i] = new SenderElem(); // 初始化每个元素
-        }
-        this.base = 0;
-        this.nextPointer = 0;
-        this.rearPointer = 0;
-
+    public SenderWindow(TCP_Sender sender) {
         this.sender = sender;
         this.timer = new UDT_Timer();
-        this.delay = delay;
-        this.period = period;
+        this.window = new LinkedBlockingDeque<>();
     }
 
     // 超时重传N个分组
     public class GBN_RetransTask extends TimerTask {
-        private TCP_Sender sender;
         private SenderWindow window;
 
-        public GBN_RetransTask(TCP_Sender sender, SenderWindow window) {
-            this.sender = sender;
+        public GBN_RetransTask(SenderWindow window) {
             this.window = window;
         }
 
@@ -51,87 +41,102 @@ public class SenderWindow {
         }
     }
 
-    // 将绝对序列号映射到窗口环形缓冲区的索引
-    private int getIndex(int seq) {
-        return seq % size;
+    private void SendtheWindow() {
+        ssthresh = Math.max(cwnd / 2, 2);
+        cwnd = 1;
+        dcwnd = 1.0;
+        SenderElem windowelem = window.peekFirst();
+        if (windowelem != null) {
+            sender.udt_send(windowelem.getPacket());
+        }
+
     }
 
-    // 检查窗口是否已满
-    public boolean isFull() {
-        return rearPointer - base == size;
-    }
-
-    // 检查窗口是否为空
-    public boolean isEmpty() {
-        return base == rearPointer;
-    }
-
-    // 检查窗口中的所有数据是否都已发送
-    public boolean isFinish() {
-        return nextPointer == rearPointer;
-    }
-
-    // 检查下一个要发送的数据包是否为base包
-    public boolean isBase() {
-        return nextPointer == base;
+    // 检查窗口是否已满，流量控制，防止发送超过拥塞窗口允许的数据。
+    public boolean iscwndFull() {
+        return window.size() >= cwnd;
     }
 
     // 将数据包放入窗口
     public void PushPacket(TCP_PACKET packet) {
-        int index = getIndex(rearPointer);
-        window[index].setElem(packet, SenderFlag.NOT_ACKED.ordinal());
-        rearPointer++;
+        // 如果窗口是空，那么则说明是第一个包
+        if (window.isEmpty()) {
+            timer = new UDT_Timer();
+            timer.schedule(new GBN_RetransTask(this), delay, period);
+        }
+        window.push(new SenderElem(packet, SenderFlag.NOT_ACKED.ordinal()));
+        sender.udt_send(packet);
     }
 
-    // 发送下一个数据包，启动重传定时器
+    // 发送下一个数据包
     public void SendPacket() {
-        // 如果窗口是空的或所有数据都已经被发送则直接退出
-        if (isEmpty() || isFinish()) {
+        SenderElem elem = window.pollFirst();
+        if (elem == null) {
             return;
         }
-
-        int index = getIndex(nextPointer);
-        TCP_PACKET packet = window[index].getPacket();
-
-        // 如果是base数据包则重传计时器启动
-        if (isBase()) {
-            timer.schedule(new GBN_RetransTask(sender, this), delay, period);
+        if (!elem.isAcked()) {
+            sender.udt_send(elem.getPacket());
         }
-
-        nextPointer++;
-        sender.udt_send(packet); // 使用不可靠信道发送数据包
+        window.offerFirst(elem);
     }
-
-    // 发送窗口中的所有数据包
-    public void SendtheWindow() {
-        nextPointer = base;
-        while (nextPointer < rearPointer) {
-            SendPacket();
-        }
-    }
-
 
     // 重置计时器
     public void resetTimer() {
         timer.cancel();
         timer = new UDT_Timer();
-        if (!isEmpty()) {
-            timer.schedule(new GBN_RetransTask(sender, this), delay, period);
+        if (!window.isEmpty()) {
+            timer.schedule(new GBN_RetransTask(this), delay, period);
+        }
+    }
+
+    // 快重传重发期望的数据包
+    public void QuickResend (int seq) {
+        int expectedseq = seq + 100;
+        for (SenderElem elem : window) {
+            if (elem.getPacket().getTcpH().getTh_seq() == expectedseq) {
+                sender.udt_send(elem.getPacket());
+                break;
+            }
         }
     }
 
     // 找到并标记对应数据包为已确认，滑动窗口
     public void AckPacket(int seq) {
-        // 找到并标记数据包为已确认，重置计时器并滑动窗口
-        for (int i = base; i != rearPointer; i++) {
-            int index = getIndex(i);
-            // 累计确认
-            if (!window[index].isAcked() && window[index].getPacket().getTcpH().getTh_seq() <= seq) {
-                window[index].ackPacket();
-                window[index].resetElem();
-                base++;
-                resetTimer(); // 重启计时器
+        // 移除已经确认的报文、慢开始、拥塞避免
+        for (SenderElem elem : window) {
+            if (elem.getPacket().getTcpH().getTh_seq() <= seq) {
+                elem.ackPacket();
+                window.remove(elem);
+                if (cwnd < ssthresh) {
+                    cwnd++;
+                    dcwnd = cwnd;
+                }
+                // 拥塞避免阶段，加法增大，每次增大窗口分之一，一个RTT后拥塞窗口大小增大MSS
+                if (cwnd >= ssthresh) {
+                    dcwnd += 1 / cwnd;
+                    cwnd = (int) dcwnd;
+                }
+            } else {
+                break;
             }
+        }
+        // 滑动完窗口之后需要重新对窗口左沿设置计时器
+        resetTimer();
+
+        // 收到重复确认进行记录
+        if (seq == latestseq) {
+            latestseqnum++;
+        } else {
+            latestseq = seq;
+            latestseqnum = 0;
+        }
+
+        // 连续收到三个重复包则重传窗口内第一个包，将ssthresh设置为cwnd的一半，cwnd设置为1
+        if (latestseqnum == 3) {
+            ssthresh = cwnd / 2;
+            cwnd = 1;
+            dcwnd = 1.0;
+            QuickResend(seq);
         }
     }
 }
