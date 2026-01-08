@@ -12,7 +12,7 @@ public class SenderWindow {
     private UDT_Timer timer; // 为发送窗口设置计时器
     private final TCP_Sender sender;
     private final int delay = 3000;
-    private final int period = 3000;
+    // private final int period = 3000;
 
     private int cwnd = 1;
     private double dcwnd = 1.0;
@@ -20,6 +20,7 @@ public class SenderWindow {
 
     private int latestseq = -1; // 最新收到的包的序号
     private int latestseqnum = 0; // 最新收到的包收到的次数
+    private int maxlatestseq = 3; // 最多能够收到三个冗余重复包
 
     // 构造函数
     public SenderWindow(TCP_Sender sender) {
@@ -68,7 +69,7 @@ public class SenderWindow {
         // 如果窗口是空，那么则说明是第一个包
         if (window.isEmpty()) {
             timer = new UDT_Timer();
-            timer.schedule(new GBN_RetransTask(this), delay, period);
+            timer.schedule(new GBN_RetransTask(this), delay);
         }
         window.addLast(new SenderElem(packet, SenderFlag.NOT_ACKED.ordinal()));
         sender.udt_send(packet);
@@ -79,7 +80,7 @@ public class SenderWindow {
         timer.cancel();
         timer = new UDT_Timer();
         if (!window.isEmpty()) {
-            timer.schedule(new GBN_RetransTask(this), delay, period);
+            timer.schedule(new GBN_RetransTask(this), delay);
         }
     }
 
@@ -126,10 +127,10 @@ public class SenderWindow {
         }
 
         // 连续收到三个重复包则重传窗口内第一个包，将ssthresh设置为cwnd的一半，cwnd设置为1
-        if (latestseqnum == 3) {
+        if (latestseqnum == maxlatestseq) {
             ssthresh = cwnd / 2;
             cwnd = 1;
-            dcwnd = 1.0;
+            dcwnd = cwnd;
             QuickResend(seq);
         }
     }

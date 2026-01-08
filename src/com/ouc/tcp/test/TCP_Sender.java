@@ -7,13 +7,12 @@ import com.ouc.tcp.client.TCP_Sender_ADT;
 import com.ouc.tcp.message.TCP_PACKET;
 
 public class TCP_Sender extends TCP_Sender_ADT {
-    private final SenderWindow window;
+    private final SenderWindow window = new SenderWindow(this);
 
     /*构造函数*/
     public TCP_Sender() {
         super();    //调用超类构造函数
         super.initTCP_Sender(this);        //初始化TCP发送端
-        window = new SenderWindow(this);
     }
 
     @Override
