@@ -62,7 +62,7 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
                     reply(ackPack);
                 }
             }, 500);
-        } else if (bufferResult != AckFlag.WITHIN.ordinal()) {
+        } else {
             reply(ackPack);
         }
 
