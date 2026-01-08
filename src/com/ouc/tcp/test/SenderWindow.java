@@ -12,7 +12,7 @@ public class SenderWindow {
     private UDT_Timer timer; // 为发送窗口设置计时器
     private final TCP_Sender sender;
     private final int delay = 3000;
-    // private final int period = 3000;
+    private final int period = 3000;
 
     private int cwnd = 1;
     private double dcwnd = 1.0;
@@ -69,7 +69,7 @@ public class SenderWindow {
         // 如果窗口是空，那么则说明是第一个包
         if (window.isEmpty()) {
             timer = new UDT_Timer();
-            timer.schedule(new GBN_RetransTask(this), delay);
+            timer.schedule(new GBN_RetransTask(this), delay, period);
         }
         window.addLast(new SenderElem(packet, SenderFlag.NOT_ACKED.ordinal()));
         sender.udt_send(packet);
@@ -80,7 +80,7 @@ public class SenderWindow {
         timer.cancel();
         timer = new UDT_Timer();
         if (!window.isEmpty()) {
-            timer.schedule(new GBN_RetransTask(this), delay);
+            timer.schedule(new GBN_RetransTask(this), delay, period);
         }
     }
 
