@@ -15,7 +15,7 @@ import java.util.TimerTask;
 public class TCP_Receiver extends TCP_Receiver_ADT {
 
     private TCP_PACKET ackPack;    //回复的ACK报文段
-    private ReceiverWindow window = new ReceiverWindow(16);
+    private final ReceiverWindow window = new ReceiverWindow(16);
 
     private UDT_Timer cumulativeTimer = new UDT_Timer(); // 设置计时器用于进行累计确认
 
@@ -31,6 +31,7 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
         //检查校验码，生成ACK
         if (CheckSum.computeChkSum(recvPack) != recvPack.getTcpH().getTh_sum()) {
             System.out.println();
+            deliver_data();
             return;
         }
         // 生成ACK报文段（设置确认号）
@@ -62,11 +63,10 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
                     reply(ackPack);
                 }
             }, 500);
-        } else if (bufferResult != AckFlag.WITHIN.ordinal()) {
+        } else {
             reply(ackPack);
         }
 
-        // 如果是错误的包，则不再回复 ACK
         System.out.println();
         deliver_data();
     }

@@ -129,7 +129,7 @@ public class SenderWindow {
         // 连续收到三个重复包则重传窗口内第一个包，将ssthresh设置为cwnd的一半，cwnd设置为1
         if (latestseqnum == maxlatestseq) {
             ssthresh = cwnd / 2;
-            cwnd = 1;
+            cwnd = ssthresh;
             dcwnd = cwnd;
             QuickResend(seq);
         }
