@@ -20,7 +20,7 @@ public class SenderWindow {
 
     private int latestseq = -1; // 最新收到的包的序号
     private int latestseqnum = 0; // 最新收到的包收到的次数
-    private int maxlatestseq = 3; // 最多能够收到三个冗余重复包
+    private int maxlatestseq = 3; // 最多能够收到三个重复包
 
     // 构造函数
     public SenderWindow(TCP_Sender sender) {
@@ -44,13 +44,6 @@ public class SenderWindow {
     }
 
     private void SendtheWindow() {
-//        ssthresh = Math.max(cwnd / 2, 2);
-//        cwnd = 1;
-//        dcwnd = 1.0;
-//        SenderElem windowelem = window.peekFirst();
-//        if (windowelem != null) {
-//            sender.udt_send(windowelem.getPacket());
-//        }
         // 发送窗口中的数据
         for (SenderElem elem : window) {
             if (!elem.isAcked()) {
