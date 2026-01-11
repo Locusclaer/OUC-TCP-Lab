@@ -2,14 +2,13 @@
 /***** Feng Hong; 2015-12-09******************************/
 package com.ouc.tcp.test;
 
+import com.ouc.tcp.client.TCP_Receiver_ADT;
+import com.ouc.tcp.message.TCP_PACKET;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-
-import com.ouc.tcp.client.TCP_Receiver_ADT;
-import com.ouc.tcp.message.*;
-import com.ouc.tcp.tool.TCP_TOOL;
 
 public class TCP_Receiver extends TCP_Receiver_ADT {
 	
@@ -51,7 +50,7 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
 			System.out.println("Recieve Computed: "+CheckSum.computeChkSum(recvPack));
 			System.out.println("Recieved Packet"+recvPack.getTcpH().getTh_sum());
 			System.out.println("Problem: Packet Number: "+recvPack.getTcpH().getTh_seq()+" + InnerSeq:  "+sequence);
-			tcpH.setTh_ack((sequence - 1) * recvPack.getTcpS().getData().length - 1);
+			tcpH.setTh_ack((sequence - 1) * recvPack.getTcpS().getData().length + 1);
 			ackPack = new TCP_PACKET(tcpH, tcpS, recvPack.getSourceAddr());
 			tcpH.setTh_sum(CheckSum.computeChkSum(ackPack));
 			//回复ACK报文段
