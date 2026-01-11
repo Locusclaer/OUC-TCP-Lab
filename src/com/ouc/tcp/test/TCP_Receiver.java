@@ -53,7 +53,7 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
                 packet = window.PacketDeliver();
             }
 
-            // 重新设置计时器，因为此时已经收到了base数据包，需要将计时器重置，如果在500ms内未收到base，则回复
+            // 重新设置计时器，因为此时已经收到了base数据包，需要将计时器重置，500ms回复
             cumulativeTimer.cancel();
             cumulativeTimer = new UDT_Timer();
             cumulativeTimer.schedule(new TimerTask() {
