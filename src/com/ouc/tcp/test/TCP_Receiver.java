@@ -14,7 +14,6 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
 
     private TCP_PACKET ackPack;    //回复的ACK报文段
     private ReceiverWindow window = new ReceiverWindow(16);
-    int sequence = 0;//用于记录当前待接收的包序号，注意包序号不完全是
 
     /*构造函数*/
     public TCP_Receiver() {
