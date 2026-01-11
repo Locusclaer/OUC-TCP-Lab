@@ -123,7 +123,7 @@ public class SenderWindow {
             latestseqnum++;
         } else {
             latestseq = seq;
-            latestseqnum = 0;
+            latestseqnum = 1;
         }
 
         // 连续收到三个重复包则重传窗口内第一个包，将ssthresh设置为cwnd的一半，cwnd设置为1
